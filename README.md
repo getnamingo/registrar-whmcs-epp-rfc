@@ -1,4 +1,6 @@
-# Compatibility
+# EPP Registry (ICANN Registrar Edition)
+
+## Compatibility
 
 This module is supposed to work with:
 
@@ -30,13 +32,13 @@ This module is supposed to work with:
 
 - ZDNS - .all
 
-# WHMCS Module Installation instructions
+## WHMCS Module Installation instructions
 
 1. Download and install [WHMCS](https://whmcs.com/)
 
 2. Place the repository as **epp** directory in `[WHMCS]/modules/registrars`, place your key.pem and cert.pem files in the same epp directory.
 
-3. Activate from Configuration -> Apps & Integrations -> (search for _epp_) -> Activate
+3. Activate from Configuration -> Apps & Integrations -> (search for _eppr_) -> Activate
 
 4. Configure from Configuration -> System Settings -> Domain Registrars
 

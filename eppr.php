@@ -1,6 +1,6 @@
 <?php
 /**
- * Indera EPP registrar module for WHMCS (https://www.whmcs.com/)
+ * Namingo EPP registrar module for WHMCS (https://www.whmcs.com/)
  *
  * Written in 2024 by Taras Kondratyuk (https://getpinga.com)
  * Based on Generic EPP with DNSsec Registrar Module for WHMCS written in 2019 by Lilian Rudenco (info@xpanel.com)
@@ -15,7 +15,7 @@ if (!defined("WHMCS")) {
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Schema\Blueprint;
 
-function epp_MetaData()
+function eppr_MetaData()
 {
     return array(
         'DisplayName' => 'EPP Registry',
@@ -23,23 +23,23 @@ function epp_MetaData()
     );
 }
 
-function _epp_error_handler($errno, $errstr, $errfile, $errline)
+function _eppr_error_handler($errno, $errstr, $errfile, $errline)
 {
     if (!preg_match("/epp/i", $errfile)) {
         return true;
     }
 
-    _epp_log("Error $errno:", "$errstr on line $errline in file $errfile");
+    _eppr_log("Error $errno:", "$errstr on line $errline in file $errfile");
 }
 
-set_error_handler('_epp_error_handler');
-_epp_log('================= ' . date("Y-m-d H:i:s") . ' =================');
+set_error_handler('_eppr_error_handler');
+_eppr_log('================= ' . date("Y-m-d H:i:s") . ' =================');
 
-function epp_getConfigArray($params = array())
+function eppr_getConfigArray($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
-    _epp_create_table();
-    _epp_create_column();
+    _eppr_log(__FUNCTION__, $params);
+    _eppr_create_table();
+    _eppr_create_column();
 
     $configarray = array(
         'FriendlyName' => array(
@@ -119,19 +119,19 @@ function epp_getConfigArray($params = array())
     return $configarray;
 }
 
-function _epp_startEppClient($params = array())
+function _eppr_startEppClient($params = array())
 {
-    $s = new epp_epp_client($params);
+    $s = new eppr_epp_client($params);
     $s->login($params['clid'], $params['pw'], $params['registrarprefix']);
     return $s;
 }
 
-function epp_RegisterDomain($params = array())
+function eppr_RegisterDomain($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -365,6 +365,30 @@ function epp_RegisterDomain($params = array())
   </command>
 </epp>');
         $r = $s->write($xml, __FUNCTION__);
+        
+        // Check if the required module 'whmcs_registrar' is active
+        if (!Capsule::table('tbladdonmodules')->where('module', 'whmcs_registrar')->exists()) {
+            // Log an error if the module is not active
+            _eppr_log('Error: Required module is not active.');
+        }
+
+        // Insert contacts and get their IDs
+        $contactIds = insertContacts($params, $contacts);
+
+        // Insert hosts and get their IDs
+        $hostIds = insertHosts($params);
+        
+        // Use the first contact ID as the registrant
+        $registrantId = $contactIds[0];
+
+        // Insert domain and get the domain ID
+        $domainId = insertDomain($params, $registrantId);
+
+        // Map contacts to domain
+        mapContactsToDomain($domainId, array_slice($contactIds, 1, 3));
+
+        // Map hosts to domain
+        mapHostsToDomain($domainId, $hostIds);
     }
 
     catch(exception $e) {
@@ -380,12 +404,12 @@ function epp_RegisterDomain($params = array())
     return $return;
 }
 
-function epp_RenewDomain($params = array())
+function eppr_RenewDomain($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -453,12 +477,12 @@ function epp_RenewDomain($params = array())
     return $return;
 }
 
-function epp_TransferDomain($params = array())
+function eppr_TransferDomain($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -504,12 +528,12 @@ function epp_TransferDomain($params = array())
     return $return;
 }
 
-function epp_GetNameservers($params = array())
+function eppr_GetNameservers($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -540,14 +564,14 @@ function epp_GetNameservers($params = array())
         }
 
         $status = array();
-        Capsule::table('epp_domain_status')->where('domain_id', '=', $params['domainid'])->delete();
+        Capsule::table('eppr_domain_status')->where('domain_id', '=', $params['domainid'])->delete();
         foreach($r->status as $e) {
             $st = (string)$e->attributes()->s;
             if ($st == 'pendingDelete') {
                 $updatedDomainStatus = Capsule::table('tbldomains')->where('id', $params['domainid'])->update(['status' => 'Cancelled']);
             }
 
-            Capsule::table('epp_domain_status')->insert(['domain_id' => $params['domainid'], 'status' => $st]);
+            Capsule::table('eppr_domain_status')->insert(['domain_id' => $params['domainid'], 'status' => $st]);
         }
     }
 
@@ -564,12 +588,12 @@ function epp_GetNameservers($params = array())
     return $return;
 }
 
-function epp_SaveNameservers($params = array())
+function eppr_SaveNameservers($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -677,12 +701,12 @@ function epp_SaveNameservers($params = array())
     return $return;
 }
 
-function epp_GetRegistrarLock($params = array())
+function eppr_GetRegistrarLock($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = 'unlocked';
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -725,12 +749,12 @@ function epp_GetRegistrarLock($params = array())
     return $return;
 }
 
-function epp_SaveRegistrarLock($params = array())
+function eppr_SaveRegistrarLock($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -835,12 +859,12 @@ function epp_SaveRegistrarLock($params = array())
     return $return;
 }
 
-function epp_GetContactDetails($params = array())
+function eppr_GetContactDetails($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -958,12 +982,12 @@ function epp_GetContactDetails($params = array())
     return $return;
 }
 
-function epp_SaveContactDetails($params = array())
+function eppr_SaveContactDetails($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -1113,12 +1137,12 @@ function epp_SaveContactDetails($params = array())
     return $return;
 }
 
-function epp_IDProtectToggle($params = array())
+function eppr_IDProtectToggle($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -1205,12 +1229,12 @@ function epp_IDProtectToggle($params = array())
     return $return;
 }
 
-function epp_GetEPPCode($params = array())
+function eppr_GetEPPCode($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -1256,12 +1280,12 @@ function epp_GetEPPCode($params = array())
     return $return;
 }
 
-function epp_RegisterNameserver($params = array())
+function eppr_RegisterNameserver($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['nameserver']);
@@ -1329,12 +1353,12 @@ function epp_RegisterNameserver($params = array())
     return $return;
 }
 
-function epp_ModifyNameserver($params = array())
+function eppr_ModifyNameserver($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['nameserver']);
@@ -1385,12 +1409,12 @@ function epp_ModifyNameserver($params = array())
     return $return;
 }
 
-function epp_DeleteNameserver($params = array())
+function eppr_DeleteNameserver($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['nameserver']);
@@ -1427,12 +1451,12 @@ function epp_DeleteNameserver($params = array())
     return $return;
 }
 
-function epp_RequestDelete($params = array())
+function eppr_RequestDelete($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -1469,14 +1493,14 @@ function epp_RequestDelete($params = array())
     return $return;
 }
 
-function epp_AdminCustomButtonArray($params = array())
+function eppr_AdminCustomButtonArray($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $domainid = $params['domainid'];
 
     // $domain = Capsule::table('tbldomains')->where('id', $domainid)->first();
 
-    $domain = Capsule::table('epp_domain_status')->where('domain_id', '=', $domainid)->where('status', '=', 'clientHold')->first();
+    $domain = Capsule::table('eppr_domain_status')->where('domain_id', '=', $domainid)->where('status', '=', 'clientHold')->first();
 
     if (isset($domain->status)) {
         return array(
@@ -1490,12 +1514,12 @@ function epp_AdminCustomButtonArray($params = array())
     }
 }
 
-function epp_OnHoldDomain($params = array())
+function eppr_OnHoldDomain($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -1575,12 +1599,12 @@ function epp_OnHoldDomain($params = array())
     return $return;
 }
 
-function epp_UnHoldDomain($params = array())
+function eppr_UnHoldDomain($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['domainname']);
@@ -1655,12 +1679,12 @@ function epp_UnHoldDomain($params = array())
     return $return;
 }
 
-function epp_TransferSync($params = array())
+function eppr_TransferSync($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['sld'] . '.' . $params['tld']);
@@ -1726,12 +1750,12 @@ function epp_TransferSync($params = array())
     return $return;
 }
 
-function epp_Sync($params = array())
+function eppr_Sync($params = array())
 {
-    _epp_log(__FUNCTION__, $params);
+    _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
-        $s = _epp_startEppClient($params);
+        $s = _eppr_startEppClient($params);
         $from = $to = array();
         $from[] = '/{{ name }}/';
         $to[] = htmlspecialchars($params['sld'] . '.' . $params['tld']);
@@ -1793,7 +1817,7 @@ function epp_Sync($params = array())
     return $return;
 }
 
-class epp_epp_client
+class eppr_epp_client
 
 {
     var $socket;
@@ -1927,7 +1951,7 @@ class epp_epp_client
 
     function read()
     {
-        _epp_log('================= read-this =================', $this);
+        _eppr_log('================= read-this =================', $this);
         $hdr = stream_get_contents($this->socket, 4);
         if ($hdr === false) {
         throw new exception('Connection appears to have closed.');
@@ -1938,19 +1962,19 @@ class epp_epp_client
         $unpacked = unpack('N', $hdr);
         $xml = fread($this->socket, ($unpacked[1] - 4));
         $xml = preg_replace('/></', ">\n<", $xml); 
-        _epp_log('================= read =================', $xml);
+        _eppr_log('================= read =================', $xml);
         return $xml;
     }
 
     function write($xml, $action = 'Unknown')
     {
-        _epp_log('================= send-this =================', $this);
-        _epp_log('================= send =================', $xml);
+        _eppr_log('================= send-this =================', $this);
+        _eppr_log('================= send =================', $xml);
         if (fwrite($this->socket, pack('N', (strlen($xml) + 4)) . $xml) === false) {
         throw new exception('Error writing to the connection.');
         }
         $r = simplexml_load_string($this->read());
-        _epp_modulelog($xml, $r, $action);
+        _eppr_modulelog($xml, $r, $action);
             if (isset($r->response) && $r->response->result->attributes()->code >= 2000) {
                 throw new exception($r->response->result->msg);
             }
@@ -2005,7 +2029,7 @@ class epp_epp_client
 
 }
 
-function _epp_modulelog($send, $responsedata, $action)
+function _eppr_modulelog($send, $responsedata, $action)
 {
     $from = $to = array();
     $from[] = "/<clID>[^<]*<\/clID>/i";
@@ -2016,13 +2040,13 @@ function _epp_modulelog($send, $responsedata, $action)
     logModuleCall('epp',$action,$sendforlog,$responsedata);
 }
 
-function _epp_log($func, $params = false)
+function _eppr_log($func, $params = false)
 {
 
     // comment line below to see logs
     //return true;
 
-    $handle = fopen(dirname(__FILE__) . '/epp.log', 'a');
+    $handle = fopen(dirname(__FILE__) . '/eppr.log', 'a');
     ob_start();
     echo "\n================= $func =================\n";
     print_r($params);
@@ -2032,16 +2056,16 @@ function _epp_log($func, $params = false)
     fclose($handle);
 }
 
-function _epp_create_table()
+function _eppr_create_table()
 {
 
     //    Capsule::schema()->table('tbldomains', function (Blueprint $table) {
     //        $table->increments('id')->unsigned()->change();
     //    });
 
-    if (!Capsule::schema()->hasTable('epp_domain_status')) {
+    if (!Capsule::schema()->hasTable('eppr_domain_status')) {
         try {
-            Capsule::schema()->create('epp_domain_status',
+            Capsule::schema()->create('eppr_domain_status',
             function (Blueprint $table)
             {
                 /** @var \Illuminate\Database\Schema\Blueprint $table */
@@ -2078,12 +2102,12 @@ function _epp_create_table()
         }
 
         catch(Exception $e) {
-            echo "Unable to create table 'epp_domain_status': {$e->getMessage() }";
+            echo "Unable to create table 'eppr_domain_status': {$e->getMessage() }";
         }
     }
 }
 
-function _epp_create_column()
+function _eppr_create_column()
 {
     if (!Capsule::schema()->hasColumn('tbldomains', 'trstatus')) {
         try {
@@ -2104,6 +2128,116 @@ function _epp_create_column()
         catch(Exception $e) {
             echo "Unable to alter table 'tbldomains' add column 'trstatus': {$e->getMessage() }";
         }
+    }
+}
+
+function insertContacts($params, $contacts) {
+    $contactIds = [];
+
+    for ($i = 1; $i <= 4; $i++) {
+        // Insert into namingo_contact table
+        $contactId = Capsule::table('namingo_contact')->insertGetId([
+            'identifier' => $contacts[$i],
+            'voice' => $params['fullphonenumber'],
+            'email' => $params['email'],
+            'clid' => 1,
+            'crid' => 1,
+            'crdate' => date('Y-m-d H:i:s.u')
+        ]);
+
+        // Save the last insert ID
+        $contactIds[] = $contactId;
+
+        // Insert into namingo_contact_postalInfo table
+        Capsule::table('namingo_contact_postalInfo')->insert([
+            'contact_id' => $contactId,
+            'type' => 1, // Assuming type is an int; adjust if needed
+            'name' => $params['firstname'] . ' ' . $params['lastname'],
+            'org' => $params['companyname'],
+            'street1' => $params['address1'],
+            'street2' => $params['address2'],
+            'street3' => $params['address3'],
+            'city' => $params['city'],
+            'sp' => $params['state'],
+            'pc' => $params['postcode'],
+            'cc' => $params['country']
+        ]);
+    }
+
+    return $contactIds;
+}
+
+function insertHosts($params) {
+    $hostIds = [];
+
+    for ($i = 1; $i <= 5; $i++) {
+        $nsParam = 'ns' . $i;
+        if (!empty($params[$nsParam])) {
+            // Check if the host already exists
+            $existingHost = Capsule::table('namingo_host')
+                ->where('name', $params[$nsParam])
+                ->first();
+
+            if ($existingHost) {
+                // Use the existing host ID
+                $hostIds[] = $existingHost->id;
+            } else {
+                // Insert into namingo_host table if it doesn't exist
+                $hostId = Capsule::table('namingo_host')->insertGetId([
+                    'name' => $params[$nsParam],
+                    'clid' => 1,
+                    'crid' => 1,
+                    'crdate' => date('Y-m-d H:i:s.u')
+                ]);
+
+                // Save the new host ID
+                $hostIds[] = $hostId;
+            }
+        }
+    }
+
+    return $hostIds;
+}
+
+function insertDomain($params, $registrantId) {
+    // Calculate expiry date
+    $crdate = date('Y-m-d H:i:s.u');
+    $exdate = date('Y-m-d H:i:s.u', strtotime("+{$params['regperiod']} years"));
+
+    // Insert into namingo_domain table
+    $domainId = Capsule::table('namingo_domain')->insertGetId([
+        'name' => $params['domainname'],
+        'clid' => 1,
+        'crid' => 1,
+        'crdate' => $crdate,
+        'exdate' => $exdate,
+        'registrant' => $registrantId
+    ]);
+
+    return $domainId;
+}
+
+function mapContactsToDomain($domainId, $contactIds) {
+    $types = ['admin', 'billing', 'tech'];
+    
+    foreach ($contactIds as $index => $contactId) {
+        // Ensure we have a corresponding type (starts from $contacts[2] for admin, billing, tech)
+        if (isset($types[$index])) {
+            Capsule::table('namingo_domain_contact_map')->insert([
+                'domain_id' => $domainId,
+                'type' => $types[$index],
+                'contact_id' => $contactId
+            ]);
+        }
+    }
+}
+
+function mapHostsToDomain($domainId, $hostIds) {
+    foreach ($hostIds as $hostId) {
+        Capsule::table('namingo_domain_host_map')->insert([
+            'domain_id' => $domainId,
+            'host_id' => $hostId
+        ]);
     }
 }
 

@@ -38,8 +38,6 @@ _eppr_log('================= ' . date("Y-m-d H:i:s") . ' =================');
 function eppr_getConfigArray($params = array())
 {
     _eppr_log(__FUNCTION__, $params);
-    _eppr_create_table();
-    _eppr_create_column();
 
     $configarray = array(
         'FriendlyName' => array(
@@ -374,21 +372,9 @@ function eppr_RegisterDomain($params = array())
 
         // Insert contacts and get their IDs
         $contactIds = insertContacts($params, $contacts);
-
-        // Insert hosts and get their IDs
-        $hostIds = insertHosts($params);
         
-        // Use the first contact ID as the registrant
-        $registrantId = $contactIds[0];
-
-        // Insert domain and get the domain ID
-        $domainId = insertDomain($params, $registrantId);
-
-        // Map contacts to domain
-        mapContactsToDomain($domainId, array_slice($contactIds, 1, 3));
-
-        // Map hosts to domain
-        mapHostsToDomain($domainId, $hostIds);
+        // Insert domain
+        insertDomain($params, $contactIds);
     }
 
     catch(exception $e) {
@@ -562,16 +548,18 @@ function eppr_GetNameservers($params = array())
             $i++;
             $return["ns{$i}"] = (string)$ns;
         }
+        
+        $namingoDomainId = getNamingoDomainId($params['domainid']);
 
         $status = array();
-        Capsule::table('eppr_domain_status')->where('domain_id', '=', $params['domainid'])->delete();
+        Capsule::table('namingo_domain_status')->where('domain_id', '=', $namingoDomainId)->delete();
         foreach($r->status as $e) {
             $st = (string)$e->attributes()->s;
             if ($st == 'pendingDelete') {
                 $updatedDomainStatus = Capsule::table('tbldomains')->where('id', $params['domainid'])->update(['status' => 'Cancelled']);
             }
 
-            Capsule::table('eppr_domain_status')->insert(['domain_id' => $params['domainid'], 'status' => $st]);
+            Capsule::table('namingo_domain_status')->insert(['domain_id' => $namingoDomainId, 'status' => $st]);
         }
     }
 
@@ -1496,11 +1484,11 @@ function eppr_RequestDelete($params = array())
 function eppr_AdminCustomButtonArray($params = array())
 {
     _eppr_log(__FUNCTION__, $params);
-    $domainid = $params['domainid'];
+    $domainid = getNamingoDomainId($params['domainid']);
 
     // $domain = Capsule::table('tbldomains')->where('id', $domainid)->first();
 
-    $domain = Capsule::table('eppr_domain_status')->where('domain_id', '=', $domainid)->where('status', '=', 'clientHold')->first();
+    $domain = Capsule::table('namingo_domain_status')->where('domain_id', '=', $domainid)->where('status', '=', 'clientHold')->first();
 
     if (isset($domain->status)) {
         return array(
@@ -1710,7 +1698,16 @@ function eppr_TransferSync($params = array())
         $r = $r->response->resData->children('urn:ietf:params:xml:ns:domain-1.0')->trnData;
         $trStatus = (string)$r->trStatus;
         $expDate = (string)$r->exDate;
-        $updatedDomainTrStatus = Capsule::table('tbldomains')->where('id', $params['domainid'])->update(['trstatus' => $trStatus]);
+        $namingoDomainId = getNamingoDomainId($params['domainid']);
+
+        if ($namingoDomainId !== null) {
+            Capsule::table('namingo_domain')
+                ->where('id', $namingoDomainId)
+                ->update(['trstatus' => $trStatus]);
+            echo "Namingo domain status updated successfully.";
+        } else {
+            echo "Failed to update Namingo domain status: domain ID not found.";
+        }
 
         switch ($trStatus) {
             case 'pending':
@@ -2056,81 +2053,6 @@ function _eppr_log($func, $params = false)
     fclose($handle);
 }
 
-function _eppr_create_table()
-{
-
-    //    Capsule::schema()->table('tbldomains', function (Blueprint $table) {
-    //        $table->increments('id')->unsigned()->change();
-    //    });
-
-    if (!Capsule::schema()->hasTable('eppr_domain_status')) {
-        try {
-            Capsule::schema()->create('eppr_domain_status',
-            function (Blueprint $table)
-            {
-                /** @var \Illuminate\Database\Schema\Blueprint $table */
-                $table->increments('id');
-                $table->integer('domain_id');
-
-                // $table->integer('domain_id')->unsigned();
-
-                $table->enum('status', array(
-                    'clientDeleteProhibited',
-                    'clientHold',
-                    'clientRenewProhibited',
-                    'clientTransferProhibited',
-                    'clientUpdateProhibited',
-                    'inactive',
-                    'ok',
-                    'pendingCreate',
-                    'pendingDelete',
-                    'pendingRenew',
-                    'pendingTransfer',
-                    'pendingUpdate',
-                    'serverDeleteProhibited',
-                    'serverHold',
-                    'serverRenewProhibited',
-                    'serverTransferProhibited',
-                    'serverUpdateProhibited'
-                ))->default('ok');
-                $table->unique(array(
-                    'domain_id',
-                    'status'
-                ));
-                $table->foreign('domain_id')->references('id')->on('tbldomains')->onDelete('cascade');
-            });
-        }
-
-        catch(Exception $e) {
-            echo "Unable to create table 'eppr_domain_status': {$e->getMessage() }";
-        }
-    }
-}
-
-function _eppr_create_column()
-{
-    if (!Capsule::schema()->hasColumn('tbldomains', 'trstatus')) {
-        try {
-            Capsule::schema()->table('tbldomains',
-            function (Blueprint $table)
-            {
-                $table->enum('trstatus', array(
-                    'clientApproved',
-                    'clientCancelled',
-                    'clientRejected',
-                    'pending',
-                    'serverApproved',
-                    'serverCancelled'
-                ))->nullable()->after('status');
-            });
-        }
-
-        catch(Exception $e) {
-            echo "Unable to alter table 'tbldomains' add column 'trstatus': {$e->getMessage() }";
-        }
-    }
-}
-
 function insertContacts($params, $contacts) {
     $contactIds = [];
 
@@ -2140,18 +2062,6 @@ function insertContacts($params, $contacts) {
             'identifier' => $contacts[$i],
             'voice' => $params['fullphonenumber'],
             'email' => $params['email'],
-            'clid' => 1,
-            'crid' => 1,
-            'crdate' => date('Y-m-d H:i:s.u')
-        ]);
-
-        // Save the last insert ID
-        $contactIds[] = $contactId;
-
-        // Insert into namingo_contact_postalInfo table
-        Capsule::table('namingo_contact_postalInfo')->insert([
-            'contact_id' => $contactId,
-            'type' => 1, // Assuming type is an int; adjust if needed
             'name' => $params['firstname'] . ' ' . $params['lastname'],
             'org' => $params['companyname'],
             'street1' => $params['address1'],
@@ -2160,46 +2070,19 @@ function insertContacts($params, $contacts) {
             'city' => $params['city'],
             'sp' => $params['state'],
             'pc' => $params['postcode'],
-            'cc' => $params['country']
+            'cc' => $params['country'],        
+            'clid' => 1,
+            'crdate' => date('Y-m-d H:i:s.u')
         ]);
+
+        // Save the last insert ID
+        $contactIds[] = $contactId;
     }
 
     return $contactIds;
 }
 
-function insertHosts($params) {
-    $hostIds = [];
-
-    for ($i = 1; $i <= 5; $i++) {
-        $nsParam = 'ns' . $i;
-        if (!empty($params[$nsParam])) {
-            // Check if the host already exists
-            $existingHost = Capsule::table('namingo_host')
-                ->where('name', $params[$nsParam])
-                ->first();
-
-            if ($existingHost) {
-                // Use the existing host ID
-                $hostIds[] = $existingHost->id;
-            } else {
-                // Insert into namingo_host table if it doesn't exist
-                $hostId = Capsule::table('namingo_host')->insertGetId([
-                    'name' => $params[$nsParam],
-                    'clid' => 1,
-                    'crid' => 1,
-                    'crdate' => date('Y-m-d H:i:s.u')
-                ]);
-
-                // Save the new host ID
-                $hostIds[] = $hostId;
-            }
-        }
-    }
-
-    return $hostIds;
-}
-
-function insertDomain($params, $registrantId) {
+function insertDomain($params, $contactIds) {
     // Calculate expiry date
     $crdate = date('Y-m-d H:i:s.u');
     $exdate = date('Y-m-d H:i:s.u', strtotime("+{$params['regperiod']} years"));
@@ -2211,34 +2094,30 @@ function insertDomain($params, $registrantId) {
         'crid' => 1,
         'crdate' => $crdate,
         'exdate' => $exdate,
-        'registrant' => $registrantId
+        'registrant' => $contactIds[0] ?? null,     // Registrant contact ID
+        'admin' => $contactIds[1] ?? null,          // Admin contact ID
+        'tech' => $contactIds[2] ?? null,           // Tech contact ID
+        'billing' => $contactIds[3] ?? null,        // Billing contact ID
+        'ns1' => $params['ns1'] ?? null,    // Name servers
+        'ns2' => $params['ns2'] ?? null,
+        'ns3' => $params['ns3'] ?? null,
+        'ns4' => $params['ns4'] ?? null,
+        'ns5' => $params['ns5'] ?? null
     ]);
 
     return $domainId;
 }
 
-function mapContactsToDomain($domainId, $contactIds) {
-    $types = ['admin', 'billing', 'tech'];
-    
-    foreach ($contactIds as $index => $contactId) {
-        // Ensure we have a corresponding type (starts from $contacts[2] for admin, billing, tech)
-        if (isset($types[$index])) {
-            Capsule::table('namingo_domain_contact_map')->insert([
-                'domain_id' => $domainId,
-                'type' => $types[$index],
-                'contact_id' => $contactId
-            ]);
-        }
-    }
-}
+function getNamingoDomainId($whmcsDomainId) {
+    // Retrieve the `namingo_domain` ID in a single query using a join
+    $namingoDomain = Capsule::table('namingo_domain')
+        ->join('tbldomains', 'namingo_domain.name', '=', 'tbldomains.domain')
+        ->where('tbldomains.id', $whmcsDomainId)
+        ->select('namingo_domain.id')
+        ->first();
 
-function mapHostsToDomain($domainId, $hostIds) {
-    foreach ($hostIds as $hostId) {
-        Capsule::table('namingo_domain_host_map')->insert([
-            'domain_id' => $domainId,
-            'host_id' => $hostId
-        ]);
-    }
+    // Return the `id` from `namingo_domain` if found, otherwise null
+    return $namingoDomain ? $namingoDomain->id : null;
 }
 
 ?>

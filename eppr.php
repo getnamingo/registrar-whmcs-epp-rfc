@@ -2291,6 +2291,7 @@ function insertDomain($params, $contactIds) {
     // Insert into namingo_domain table
     $domainId = Capsule::table('namingo_domain')->insertGetId([
         'name' => $params['domainname'],
+        'registry_domain_id' => '',
         'clid' => 1,
         'crid' => 1,
         'crdate' => $crdate,

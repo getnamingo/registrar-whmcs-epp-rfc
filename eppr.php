@@ -1967,6 +1967,7 @@ function eppr_Sync($params = array())
         $r = $s->write($xml, __FUNCTION__);
         $r = $r->response->resData->children('urn:ietf:params:xml:ns:domain-1.0')->infData;
         $expDate = (string)$r->exDate;
+        $roid = (string)$r->roid;
         $timestamp = strtotime($expDate);
 
         if ($timestamp === false) {
@@ -1980,10 +1981,12 @@ function eppr_Sync($params = array())
         // Format `exDate` to `YYYY-MM-DD HH:MM:SS.000`
         $formattedExpDate = date('Y-m-d H:i:s.000', $timestamp);
 
-        // Update `namingo_domain` table with the `exdate` for the specific domain
         Capsule::table('namingo_domain')
             ->where('name', $params['domain'])
-            ->update(['exdate' => $formattedExpDate]);
+            ->update([
+                'exdate' => $formattedExpDate,
+                'registry_domain_id' => $roid
+            ]);
 
         if ($timestamp < time()) {
             return array(

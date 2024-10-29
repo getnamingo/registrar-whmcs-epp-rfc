@@ -5,7 +5,7 @@
   "license": "MIT",
   "category": "domains",
   "description": {
-    "name": "EPP Registry (ICANN Registrar Edition)",
+    "name": "Namingo EPP",
     "tagline": "This module can be used with any registry that supports RFC 5731, 5732, 5733, 5734"
   },
   "logo": {

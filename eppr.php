@@ -14,12 +14,14 @@ if (!defined("WHMCS")) {
 
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Schema\Blueprint;
+use WHMCS\Carbon;
+use WHMCS\Domain\Registrar\Domain;
 
 function eppr_MetaData()
 {
     return array(
         'DisplayName' => 'EPP Registry',
-        'APIVersion' => '1.0.1',
+        'APIVersion' => '1.1',
     );
 }
 
@@ -1892,16 +1894,10 @@ function eppr_TransferSync($params = array())
         $r = $r->response->resData->children('urn:ietf:params:xml:ns:domain-1.0')->trnData;
         $trStatus = (string)$r->trStatus;
         $expDate = (string)$r->exDate;
-        $namingoDomainId = getNamingoDomainId($params['domainid']);
 
-        if ($namingoDomainId !== null) {
-            Capsule::table('namingo_domain')
-                ->where('id', $namingoDomainId)
-                ->update(['trstatus' => $trStatus]);
-            echo "Namingo domain status updated successfully.";
-        } else {
-            echo "Failed to update Namingo domain status: domain ID not found.";
-        }
+        Capsule::table('namingo_domain')
+            ->where('name', $params['domain'])
+            ->update(['trstatus' => $trStatus]);
 
         switch ($trStatus) {
             case 'pending':
@@ -1980,6 +1976,14 @@ function eppr_Sync($params = array())
         }
 
         $expDate = preg_replace("/^(\d+\-\d+\-\d+)\D.*$/", "$1", $expDate);
+
+        // Format `exDate` to `YYYY-MM-DD HH:MM:SS.000`
+        $formattedExpDate = date('Y-m-d H:i:s.000', $timestamp);
+
+        // Update `namingo_domain` table with the `exdate` for the specific domain
+        Capsule::table('namingo_domain')
+            ->where('name', $params['domain'])
+            ->update(['exdate' => $formattedExpDate]);
 
         if ($timestamp < time()) {
             return array(

@@ -1,6 +1,6 @@
 # Generic EPP Module for Namingo Registrar Platform
 
-This is an **EPP Registrar Module** specifically designed for the Namingo Registrar platform’s WHMCS edition. It leverages the Generic RFC EPP standard but is uniquely configured to work only with Namingo’s ICANN-accredited registrar services.
+This is an **EPP Registrar Module** specifically designed for the Namingo Registrar platform’s WHMCS edition.
 
 > ⚠️ **Note**: This module is exclusive to the Namingo Registrar platform’s WHMCS edition and is not compatible with standard WHMCS installations.
 

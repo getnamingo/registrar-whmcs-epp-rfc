@@ -1,59 +1,39 @@
-# EPP Registry (ICANN Registrar Edition)
+# Generic EPP Module for Namingo Registrar Platform
+
+This is an **EPP Registrar Module** specifically designed for the Namingo Registrar platform’s WHMCS edition. It leverages the Generic RFC EPP standard but is uniquely configured to work only with Namingo’s ICANN-accredited registrar services.
+
+> ⚠️ **Note**: This module is exclusive to the Namingo Registrar platform’s WHMCS edition and is not compatible with standard WHMCS installations.
 
 ## Compatibility
 
-This module is supposed to work with:
+This module supports **all gTLDs** that use the following platforms:
 
-- Any Generic RFC EPP registry.
+- Any Generic RFC EPP gTLD registry
 
-- Caucasus Online - .ge
+- CentralNic
 
-- CentralNic - all
+- CoCCA
 
-- CoCCA - all
+- CORE/Knipp
 
-- CORE/Knipp - all
+- Domain Name Services (Pty) Ltd.
 
-- GoDaddy Registry - all
+- GoDaddy Registry
 
-- Google Nomulus - all
+- Google Nomulus
 
-- HKIRC - .hk
+- Identity Digital
 
-- Identity Digital - all
+- RyCE
 
-- RoTLD - .ro
+- SIDN
 
-- RyCE - all
+- Tucows Registry Services
 
-- SIDN - all
+- ZDNS
 
-- ZADNA - .za
+> **Note**: For ccTLD support, please use our standard [WHMCS-EPP-RFC module](https://github.com/getpinga/whmcs-epp-rfc) for full compatibility.
 
-- ZDNS - .all
+## Installation instructions
 
-## WHMCS Module Installation instructions
-
-1. Download and install [WHMCS](https://whmcs.com/)
-
-2. Place the repository as **eppr** directory in `[WHMCS]/modules/registrars`, place your key.pem and cert.pem files in the same eppr directory.
-
-3. Activate from Configuration -> Apps & Integrations -> (search for _eppr_) -> Activate
-
-4. Configure from Configuration -> System Settings -> Domain Registrars
-
-5. Add a new TLD using Configuration -> System Settings -> Domain Pricing
-
-6. Create a **whois.json** file in `[WHMCS]/resources/domains` and add the following:
-
-```
-[
-    {
-        "extensions": ".yourtld",
-        "uri": "socket://your.whois.url",
-        "available": "NOT FOUND"
-    }
-]
-```
-
-You should be good to go now.
+This module is exclusively for use as part of the **Namingo Registrar Platform (WHMCS Edition)**. For complete installation instructions, please visit the [Installation Guide](https://namingo.org/registrar).

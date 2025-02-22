@@ -114,6 +114,12 @@ function eppr_getConfigArray($params = array())
             'Type' => 'text',
             'Size' => '4',
             'Description' => 'Registry assigns each registrar a unique prefix with which that registrar must create contact IDs.'
+        ),
+        'icannMinimumDataSet' => array(
+            'FriendlyName' => 'ICANN Minimum Data Set',
+            'Type' => 'yesno',
+            'Description' => 'Activate minimum data set for this registry',
+            'Default' => '0'
         )
     );
     return $configarray;
@@ -164,83 +170,85 @@ function eppr_RegisterDomain($params = array())
             throw new exception($r->cd[0]->name . ' ' . $reason);
         }
 
-        $contacts = array();
-        foreach(array(
-            'registrant',
-            'admin',
-            'tech',
-            'billing'
-        ) as $i => $contactType) {
-            // contact:create
-            $from = $to = array();
-            $from[] = '/{{ id }}/';
-            $to[] = strtoupper($s->generateRandomString());
-            $from[] = '/{{ name }}/';
-            $to[] = htmlspecialchars($params['firstname'] . ' ' . $params['lastname']);
-            $from[] = '/{{ org }}/';
-            $to[] = htmlspecialchars($params['companyname']);
-            $from[] = '/{{ street1 }}/';
-            $to[] = htmlspecialchars($params['address1']);
-            $from[] = '/{{ street2 }}/';
-            $to[] = htmlspecialchars($params['address2']);
-            $from[] = '/{{ street3 }}/';
-            $street3 = (isset($params['address3']) ? $params['address3'] : '');
-            $to[] = htmlspecialchars($street3);
-            $from[] = '/{{ city }}/';
-            $to[] = htmlspecialchars($params['city']);
-            $from[] = '/{{ state }}/';
-            $to[] = htmlspecialchars($params['state']);
-            $from[] = '/{{ postcode }}/';
-            $to[] = htmlspecialchars($params['postcode']);
-            $from[] = '/{{ country }}/';
-            $to[] = htmlspecialchars($params['country']);
-            $from[] = '/{{ phonenumber }}/';
-            $to[] = htmlspecialchars($params['fullphonenumber']);
-            $from[] = '/{{ email }}/';
-            $to[] = htmlspecialchars($params['email']);
-            $from[] = '/{{ authInfo }}/';
-            $to[] = htmlspecialchars($s->generateObjectPW());
-            $from[] = '/{{ clTRID }}/';
-            $clTRID = str_replace('.', '', round(microtime(1), 3));
-            $to[] = htmlspecialchars($params['registrarprefix'] . '-contact-create-' . $clTRID);
-            $from[] = "/<\w+:\w+>\s*<\/\w+:\w+>\s+/ims";
-            $to[] = '';
-            $xml = preg_replace($from, $to, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
-  <command>
-    <create>
-      <contact:create
-       xmlns:contact="urn:ietf:params:xml:ns:contact-1.0">
-        <contact:id>{{ id }}</contact:id>
-        <contact:postalInfo type="int">
-          <contact:name>{{ name }}</contact:name>
-          <contact:org>{{ org }}</contact:org>
-          <contact:addr>
-            <contact:street>{{ street1 }}</contact:street>
-            <contact:street>{{ street2 }}</contact:street>
-            <contact:street>{{ street3 }}</contact:street>
-            <contact:city>{{ city }}</contact:city>
-            <contact:sp>{{ state }}</contact:sp>
-            <contact:pc>{{ postcode }}</contact:pc>
-            <contact:cc>{{ country }}</contact:cc>
-          </contact:addr>
-        </contact:postalInfo>
-        <contact:voice>{{ phonenumber }}</contact:voice>
-        <contact:fax></contact:fax>
-        <contact:email>{{ email }}</contact:email>
-        <contact:authInfo>
-          <contact:pw>{{ authInfo }}</contact:pw>
-        </contact:authInfo>
-      </contact:create>
-    </create>
-    <clTRID>{{ clTRID }}</clTRID>
-  </command>
-</epp>');
-            $r = $s->write($xml, __FUNCTION__);
-            $r = $r->response->resData->children('urn:ietf:params:xml:ns:contact-1.0')->creData;
-            $contacts[$i + 1] = $r->id;
+        if (empty($this->params['icannMinimumDataSet']) || $this->params['icannMinimumDataSet'] != 'on') {
+            $contacts = array();
+            foreach(array(
+                'registrant',
+                'admin',
+                'tech',
+                'billing'
+            ) as $i => $contactType) {
+                // contact:create
+                $from = $to = array();
+                $from[] = '/{{ id }}/';
+                $to[] = strtoupper($s->generateRandomString());
+                $from[] = '/{{ name }}/';
+                $to[] = htmlspecialchars($params['firstname'] . ' ' . $params['lastname']);
+                $from[] = '/{{ org }}/';
+                $to[] = htmlspecialchars($params['companyname']);
+                $from[] = '/{{ street1 }}/';
+                $to[] = htmlspecialchars($params['address1']);
+                $from[] = '/{{ street2 }}/';
+                $to[] = htmlspecialchars($params['address2']);
+                $from[] = '/{{ street3 }}/';
+                $street3 = (isset($params['address3']) ? $params['address3'] : '');
+                $to[] = htmlspecialchars($street3);
+                $from[] = '/{{ city }}/';
+                $to[] = htmlspecialchars($params['city']);
+                $from[] = '/{{ state }}/';
+                $to[] = htmlspecialchars($params['state']);
+                $from[] = '/{{ postcode }}/';
+                $to[] = htmlspecialchars($params['postcode']);
+                $from[] = '/{{ country }}/';
+                $to[] = htmlspecialchars($params['country']);
+                $from[] = '/{{ phonenumber }}/';
+                $to[] = htmlspecialchars($params['fullphonenumber']);
+                $from[] = '/{{ email }}/';
+                $to[] = htmlspecialchars($params['email']);
+                $from[] = '/{{ authInfo }}/';
+                $to[] = htmlspecialchars($s->generateObjectPW());
+                $from[] = '/{{ clTRID }}/';
+                $clTRID = str_replace('.', '', round(microtime(1), 3));
+                $to[] = htmlspecialchars($params['registrarprefix'] . '-contact-create-' . $clTRID);
+                $from[] = "/<\w+:\w+>\s*<\/\w+:\w+>\s+/ims";
+                $to[] = '';
+                $xml = preg_replace($from, $to, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    <epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
+      <command>
+        <create>
+          <contact:create
+           xmlns:contact="urn:ietf:params:xml:ns:contact-1.0">
+            <contact:id>{{ id }}</contact:id>
+            <contact:postalInfo type="int">
+              <contact:name>{{ name }}</contact:name>
+              <contact:org>{{ org }}</contact:org>
+              <contact:addr>
+                <contact:street>{{ street1 }}</contact:street>
+                <contact:street>{{ street2 }}</contact:street>
+                <contact:street>{{ street3 }}</contact:street>
+                <contact:city>{{ city }}</contact:city>
+                <contact:sp>{{ state }}</contact:sp>
+                <contact:pc>{{ postcode }}</contact:pc>
+                <contact:cc>{{ country }}</contact:cc>
+              </contact:addr>
+            </contact:postalInfo>
+            <contact:voice>{{ phonenumber }}</contact:voice>
+            <contact:fax></contact:fax>
+            <contact:email>{{ email }}</contact:email>
+            <contact:authInfo>
+              <contact:pw>{{ authInfo }}</contact:pw>
+            </contact:authInfo>
+          </contact:create>
+        </create>
+        <clTRID>{{ clTRID }}</clTRID>
+      </command>
+    </epp>');
+                $r = $s->write($xml, __FUNCTION__);
+                $r = $r->response->resData->children('urn:ietf:params:xml:ns:contact-1.0')->creData;
+                $contacts[$i + 1] = $r->id;
+            }
         }
 
         foreach(array(
@@ -320,14 +328,16 @@ function eppr_RegisterDomain($params = array())
         $to[] = htmlspecialchars($params['ns4']);
         $from[] = '/{{ ns5 }}/';
         $to[] = htmlspecialchars($params['ns5']);        
-        $from[] = '/{{ cID_1 }}/';
-        $to[] = htmlspecialchars($contacts[1]);
-        $from[] = '/{{ cID_2 }}/';
-        $to[] = htmlspecialchars($contacts[2]);
-        $from[] = '/{{ cID_3 }}/';
-        $to[] = htmlspecialchars($contacts[3]);
-        $from[] = '/{{ cID_4 }}/';
-        $to[] = htmlspecialchars($contacts[4]);
+        if (empty($this->params['icannMinimumDataSet']) || $this->params['icannMinimumDataSet'] != 'on') {
+            $from[] = '/{{ cID_1 }}/';
+            $to[] = htmlspecialchars($contacts[1]);
+            $from[] = '/{{ cID_2 }}/';
+            $to[] = htmlspecialchars($contacts[2]);
+            $from[] = '/{{ cID_3 }}/';
+            $to[] = htmlspecialchars($contacts[3]);
+            $from[] = '/{{ cID_4 }}/';
+            $to[] = htmlspecialchars($contacts[4]);
+        }
         $from[] = '/{{ authInfo }}/';
         $to[] = htmlspecialchars($s->generateObjectPW());
         $from[] = '/{{ clTRID }}/';
@@ -335,35 +345,63 @@ function eppr_RegisterDomain($params = array())
         $to[] = htmlspecialchars($params['registrarprefix'] . '-domain-create-' . $clTRID);
         $from[] = "/<\w+:\w+>\s*<\/\w+:\w+>\s+/ims";
         $to[] = '';
-        $xml = preg_replace($from, $to, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
-  <command>
-    <create>
-      <domain:create
-       xmlns:domain="urn:ietf:params:xml:ns:domain-1.0">
-        <domain:name>{{ name }}</domain:name>
-        <domain:period unit="y">{{ period }}</domain:period>
-        <domain:ns>
-          <domain:hostObj>{{ ns1 }}</domain:hostObj>
-          <domain:hostObj>{{ ns2 }}</domain:hostObj>
-          <domain:hostObj>{{ ns3 }}</domain:hostObj>
-          <domain:hostObj>{{ ns4 }}</domain:hostObj>
-          <domain:hostObj>{{ ns5 }}</domain:hostObj>
-        </domain:ns>
-        <domain:registrant>{{ cID_1 }}</domain:registrant>
-        <domain:contact type="admin">{{ cID_2 }}</domain:contact>
-        <domain:contact type="tech">{{ cID_3 }}</domain:contact>
-        <domain:contact type="billing">{{ cID_4 }}</domain:contact>
-        <domain:authInfo>
-          <domain:pw>{{ authInfo }}</domain:pw>
-        </domain:authInfo>
-      </domain:create>
-    </create>
-    <clTRID>{{ clTRID }}</clTRID>
-  </command>
-</epp>');
+        if (empty($this->params['icannMinimumDataSet']) || $this->params['icannMinimumDataSet'] != 'on') {
+            $xml = preg_replace($from, $to, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    <epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
+      <command>
+        <create>
+          <domain:create
+           xmlns:domain="urn:ietf:params:xml:ns:domain-1.0">
+            <domain:name>{{ name }}</domain:name>
+            <domain:period unit="y">{{ period }}</domain:period>
+            <domain:ns>
+              <domain:hostObj>{{ ns1 }}</domain:hostObj>
+              <domain:hostObj>{{ ns2 }}</domain:hostObj>
+              <domain:hostObj>{{ ns3 }}</domain:hostObj>
+              <domain:hostObj>{{ ns4 }}</domain:hostObj>
+              <domain:hostObj>{{ ns5 }}</domain:hostObj>
+            </domain:ns>
+            <domain:registrant>{{ cID_1 }}</domain:registrant>
+            <domain:contact type="admin">{{ cID_2 }}</domain:contact>
+            <domain:contact type="tech">{{ cID_3 }}</domain:contact>
+            <domain:contact type="billing">{{ cID_4 }}</domain:contact>
+            <domain:authInfo>
+              <domain:pw>{{ authInfo }}</domain:pw>
+            </domain:authInfo>
+          </domain:create>
+        </create>
+        <clTRID>{{ clTRID }}</clTRID>
+      </command>
+    </epp>');
+        } else {
+            $xml = preg_replace($from, $to, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    <epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
+      <command>
+        <create>
+          <domain:create
+           xmlns:domain="urn:ietf:params:xml:ns:domain-1.0">
+            <domain:name>{{ name }}</domain:name>
+            <domain:period unit="y">{{ period }}</domain:period>
+            <domain:ns>
+              <domain:hostObj>{{ ns1 }}</domain:hostObj>
+              <domain:hostObj>{{ ns2 }}</domain:hostObj>
+              <domain:hostObj>{{ ns3 }}</domain:hostObj>
+              <domain:hostObj>{{ ns4 }}</domain:hostObj>
+              <domain:hostObj>{{ ns5 }}</domain:hostObj>
+            </domain:ns>
+            <domain:authInfo>
+              <domain:pw>{{ authInfo }}</domain:pw>
+            </domain:authInfo>
+          </domain:create>
+        </create>
+        <clTRID>{{ clTRID }}</clTRID>
+      </command>
+    </epp>');
+        }
         $r = $s->write($xml, __FUNCTION__);
         
         // Check if the required module 'whmcs_registrar' is active
@@ -372,11 +410,16 @@ function eppr_RegisterDomain($params = array())
             _eppr_log('Error: Required module is not active.');
         }
 
-        // Insert contacts and get their IDs
-        $contactIds = insertContacts($params, $contacts);
-        
-        // Insert domain
-        insertDomain($params, $contactIds);
+        if (empty($this->params['icannMinimumDataSet']) || $this->params['icannMinimumDataSet'] != 'on') {
+            // Insert contacts and get their IDs
+            $contactIds = insertContacts($params, $contacts);
+            
+            // Insert domain
+            insertDomain($params, $contactIds);
+        } else {
+            // Insert domain
+            insertDomain($params, []);
+        }
     }
 
     catch(exception $e) {
@@ -851,6 +894,10 @@ function eppr_SaveRegistrarLock($params = array())
 
 function eppr_GetContactDetails($params = array())
 {
+    if (!empty($params['icannMinimumDataSet']) && $params['icannMinimumDataSet'] == 'on') {
+        return [];
+    }
+
     _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
@@ -974,6 +1021,10 @@ function eppr_GetContactDetails($params = array())
 
 function eppr_SaveContactDetails($params = array())
 {
+    if (!empty($params['icannMinimumDataSet']) && $params['icannMinimumDataSet'] == 'on') {
+        return [];
+    }
+
     _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {
@@ -1129,6 +1180,10 @@ function eppr_SaveContactDetails($params = array())
 
 function eppr_IDProtectToggle($params = array())
 {
+    if (!empty($params['icannMinimumDataSet']) && $params['icannMinimumDataSet'] == 'on') {
+        return [];
+    }
+
     _eppr_log(__FUNCTION__, $params);
     $return = array();
     try {

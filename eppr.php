@@ -1022,7 +1022,7 @@ function eppr_GetContactDetails($params = array())
 function eppr_SaveContactDetails($params = array())
 {
     if (!empty($params['icannMinimumDataSet']) && $params['icannMinimumDataSet'] == 'on') {
-        return [];
+        return ['success' => true];
     }
 
     _eppr_log(__FUNCTION__, $params);
@@ -1181,7 +1181,7 @@ function eppr_SaveContactDetails($params = array())
 function eppr_IDProtectToggle($params = array())
 {
     if (!empty($params['icannMinimumDataSet']) && $params['icannMinimumDataSet'] == 'on') {
-        return [];
+        return ['success' => true];
     }
 
     _eppr_log(__FUNCTION__, $params);

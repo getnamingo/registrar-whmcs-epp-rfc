@@ -170,7 +170,7 @@ function eppr_RegisterDomain($params = array())
             throw new exception($r->cd[0]->name . ' ' . $reason);
         }
 
-        if (empty(params['icannMinimumDataSet']) || params['icannMinimumDataSet'] != 'on') {
+        if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             $contacts = array();
             foreach(array(
                 'registrant',
@@ -328,7 +328,7 @@ function eppr_RegisterDomain($params = array())
         $to[] = htmlspecialchars($params['ns4']);
         $from[] = '/{{ ns5 }}/';
         $to[] = htmlspecialchars($params['ns5']);        
-        if (empty(params['icannMinimumDataSet']) || params['icannMinimumDataSet'] != 'on') {
+        if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             $from[] = '/{{ cID_1 }}/';
             $to[] = htmlspecialchars($contacts[1]);
             $from[] = '/{{ cID_2 }}/';
@@ -345,7 +345,7 @@ function eppr_RegisterDomain($params = array())
         $to[] = htmlspecialchars($params['registrarprefix'] . '-domain-create-' . $clTRID);
         $from[] = "/<\w+:\w+>\s*<\/\w+:\w+>\s+/ims";
         $to[] = '';
-        if (empty(params['icannMinimumDataSet']) || params['icannMinimumDataSet'] != 'on') {
+        if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             $xml = preg_replace($from, $to, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     <epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -410,7 +410,7 @@ function eppr_RegisterDomain($params = array())
             _eppr_log('Error: Required module is not active.');
         }
 
-        if (empty(params['icannMinimumDataSet']) || params['icannMinimumDataSet'] != 'on') {
+        if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             // Insert contacts and get their IDs
             $contactIds = insertContacts($params, $contacts);
             

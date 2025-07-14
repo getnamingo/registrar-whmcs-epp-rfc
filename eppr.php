@@ -412,13 +412,13 @@ function eppr_RegisterDomain($params = array())
 
         if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             // Insert contacts and get their IDs
-            $contactIds = insertContacts($params, $contacts);
+            $contactIds = eppr_insertContacts($params, $contacts);
             
             // Insert domain
-            insertDomain($params, $contactIds);
+            eppr_insertDomain($params, $contactIds);
         } else {
             // Insert domain
-            insertDomain($params, []);
+            eppr_insertDomain($params, []);
         }
     }
 
@@ -594,7 +594,7 @@ function eppr_GetNameservers($params = array())
             $return["ns{$i}"] = (string)$ns;
         }
 
-        $whmcsDomainId = getWhmcsDomainIdFromNamingo($params['domainname']);
+        $whmcsDomainId = eppr_getWhmcsDomainIdFromNamingo($params['domainname']);
 
         $status = array();
         Capsule::table('namingo_domain_status')->where('domain_id', '=', $whmcsDomainId)->delete();
@@ -1735,7 +1735,7 @@ function eppr_ClientAreaCustomButtonArray()
 function eppr_AdminCustomButtonArray($params = array())
 {
     _eppr_log(__FUNCTION__, $params);
-    $domainid = getNamingoDomainId($params['domainid']);
+    $domainid = eppr_getNamingoDomainId($params['domainid']);
 
     // $domain = Capsule::table('tbldomains')->where('id', $domainid)->first();
 
@@ -2309,7 +2309,7 @@ function _eppr_log($func, $params = false)
     fclose($handle);
 }
 
-function insertContacts($params, $contacts) {
+function eppr_insertContacts($params, $contacts) {
     $contactIds = [];
 
     for ($i = 1; $i <= 4; $i++) {
@@ -2338,7 +2338,7 @@ function insertContacts($params, $contacts) {
     return $contactIds;
 }
 
-function insertDomain($params, $contactIds) {
+function eppr_insertDomain($params, $contactIds) {
     // Calculate expiry date
     $crdate = date('Y-m-d H:i:s.u');
     $exdate = date('Y-m-d H:i:s.u', strtotime("+{$params['regperiod']} years"));
@@ -2365,7 +2365,7 @@ function insertDomain($params, $contactIds) {
     return $domainId;
 }
 
-function getNamingoDomainId($whmcsDomainId) {
+function eppr_getNamingoDomainId($whmcsDomainId) {
     $result = Capsule::selectOne("
         SELECT namingo_domain.id
         FROM namingo_domain
@@ -2377,7 +2377,7 @@ function getNamingoDomainId($whmcsDomainId) {
     return $result ? $result->id : null;
 }
 
-function getWhmcsDomainIdFromNamingo($namingoDomainName) {
+function eppr_getWhmcsDomainIdFromNamingo($namingoDomainName) {
     return Capsule::table('tbldomains')
         ->whereRaw('LOWER(domain) = ?', [strtolower($namingoDomainName)])
         ->value('id');

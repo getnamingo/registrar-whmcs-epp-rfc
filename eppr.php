@@ -170,7 +170,7 @@ function eppr_RegisterDomain($params = array())
             throw new exception($r->cd[0]->name . ' ' . $reason);
         }
 
-        if (empty($this->params['icannMinimumDataSet']) || $this->params['icannMinimumDataSet'] != 'on') {
+        if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             $contacts = array();
             foreach(array(
                 'registrant',
@@ -328,7 +328,7 @@ function eppr_RegisterDomain($params = array())
         $to[] = htmlspecialchars($params['ns4']);
         $from[] = '/{{ ns5 }}/';
         $to[] = htmlspecialchars($params['ns5']);        
-        if (empty($this->params['icannMinimumDataSet']) || $this->params['icannMinimumDataSet'] != 'on') {
+        if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             $from[] = '/{{ cID_1 }}/';
             $to[] = htmlspecialchars($contacts[1]);
             $from[] = '/{{ cID_2 }}/';
@@ -345,7 +345,7 @@ function eppr_RegisterDomain($params = array())
         $to[] = htmlspecialchars($params['registrarprefix'] . '-domain-create-' . $clTRID);
         $from[] = "/<\w+:\w+>\s*<\/\w+:\w+>\s+/ims";
         $to[] = '';
-        if (empty($this->params['icannMinimumDataSet']) || $this->params['icannMinimumDataSet'] != 'on') {
+        if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             $xml = preg_replace($from, $to, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     <epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -410,7 +410,7 @@ function eppr_RegisterDomain($params = array())
             _eppr_log('Error: Required module is not active.');
         }
 
-        if (empty($this->params['icannMinimumDataSet']) || $this->params['icannMinimumDataSet'] != 'on') {
+        if (empty($params['icannMinimumDataSet']) || $params['icannMinimumDataSet'] != 'on') {
             // Insert contacts and get their IDs
             $contactIds = insertContacts($params, $contacts);
             
@@ -593,18 +593,18 @@ function eppr_GetNameservers($params = array())
             $i++;
             $return["ns{$i}"] = (string)$ns;
         }
-        
-        $namingoDomainId = getNamingoDomainId($params['domainid']);
+
+        $whmcsDomainId = getWhmcsDomainIdFromNamingo($params['domainname']);
 
         $status = array();
-        Capsule::table('namingo_domain_status')->where('domain_id', '=', $namingoDomainId)->delete();
+        Capsule::table('namingo_domain_status')->where('domain_id', '=', $whmcsDomainId)->delete();
         foreach($r->status as $e) {
             $st = (string)$e->attributes()->s;
             if ($st == 'pendingDelete') {
                 $updatedDomainStatus = Capsule::table('tbldomains')->where('id', $params['domainid'])->update(['status' => 'Cancelled']);
             }
 
-            Capsule::table('namingo_domain_status')->insert(['domain_id' => $namingoDomainId, 'status' => $st]);
+            Capsule::table('namingo_domain_status')->insert(['domain_id' => $whmcsDomainId, 'status' => $st]);
         }
     }
 
@@ -2366,15 +2366,21 @@ function insertDomain($params, $contactIds) {
 }
 
 function getNamingoDomainId($whmcsDomainId) {
-    // Retrieve the `namingo_domain` ID in a single query using a join
-    $namingoDomain = Capsule::table('namingo_domain')
-        ->join('tbldomains', 'namingo_domain.name', '=', 'tbldomains.domain')
-        ->where('tbldomains.id', $whmcsDomainId)
-        ->select('namingo_domain.id')
-        ->first();
+    $result = Capsule::selectOne("
+        SELECT namingo_domain.id
+        FROM namingo_domain
+        JOIN tbldomains ON LOWER(namingo_domain.name) = LOWER(tbldomains.domain)
+        WHERE tbldomains.id = ?
+        LIMIT 1
+    ", [$whmcsDomainId]);
 
-    // Return the `id` from `namingo_domain` if found, otherwise null
-    return $namingoDomain ? $namingoDomain->id : null;
+    return $result ? $result->id : null;
+}
+
+function getWhmcsDomainIdFromNamingo($namingoDomainName) {
+    return Capsule::table('tbldomains')
+        ->whereRaw('LOWER(domain) = ?', [strtolower($namingoDomainName)])
+        ->value('id');
 }
 
 ?>

@@ -1,39 +1,49 @@
-# Generic EPP Module for Namingo Registrar Platform
+# ⚠️ Deprecated: WHMCS ICANN Registrar Module
 
-This is an **EPP Registrar Module** specifically designed for the Namingo Registrar platform’s WHMCS edition.
+This repository is **deprecated** and is no longer maintained.
 
-> ⚠️ **Note**: This module is exclusive to the Namingo Registrar platform’s WHMCS edition and is not compatible with standard WHMCS installations.
+The functionality provided here has been replaced by a more flexible and actively maintained solution:
 
-## Compatibility
+👉 **WHMCS EPP Registrar**  
+https://github.com/getnamingo/whmcs-epp-registrar
 
-This module supports **all gTLDs** that use the following platforms:
+---
 
-- Any Generic RFC EPP gTLD registry
+## Why this project is deprecated
 
-- CentralNic
+This module was originally designed specifically for ICANN-based registrar workflows.  
+It has since been superseded by a **generic EPP registrar module** that:
 
-- CoCCA
+- Supports both **gTLD and ccTLD** registries
+- Provides a cleaner configuration model
+- Is actively maintained and extended
+- Is not tied to ICANN-only assumptions
 
-- CORE/Knipp
+---
 
-- Domain Name Services (Pty) Ltd.
+## What should you do?
 
-- GoDaddy Registry
+- **New installations** → use  
+  https://github.com/getnamingo/whmcs-epp-registrar
 
-- Google Nomulus
+- **Existing installations** → plan migration to the generic EPP module
 
-- Identity Digital
+No new features or fixes will be added to this repository.
 
-- RyCE
+---
 
-- SIDN
+## Status
 
-- Tucows Registry Services
+- ❌ Deprecated
+- ❌ No active development
+- ❌ No support
 
-- ZDNS
+For ongoing development and support, please refer to:
 
-> **Note**: For ccTLD support, please use our standard [WHMCS-EPP-RFC module](https://github.com/getpinga/whmcs-epp-rfc) for full compatibility.
+https://github.com/getnamingo/whmcs-epp-registrar
 
-## Installation instructions
+---
 
-This module is exclusively for use as part of the **Namingo Registrar Platform (WHMCS Edition)**. For complete installation instructions, please visit the [Installation Guide](https://namingo.org/registrar).
+## License
+
+This repository remains available under its original license.
